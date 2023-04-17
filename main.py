@@ -5,18 +5,23 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from bairunsheng.model.data import PictureSet
 from bairunsheng.model.net import ReconstructionNet
+from  bairunsheng.tools.UnNormalize import unNormalize
 import torch.optim as optim
 from tensorboardX import SummaryWriter
 import sys
 sys.path.append("C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng")
 
-# ----------------------------------训练过程---------------------------------------
-# 基本准备
-net = ReconstructionNet()
-maxEpoch = 75
 
+# ----------------------------------基本准备---------------------------------------
+net = ReconstructionNet()
+maxEpoch = 2
+meanCal = [0.0024475607, 0.0055219554, 0.010198287]
+stdCal = [0.027039433, 0.033439837, 0.03856222]
+
+# criterion = nn.SmoothL1Loss()
 criterion = nn.MSELoss()
-optimizer = optim.SGD(net.parameters(), lr=0.05, momentum=0.8, dampening=0.1)
+# optimizer = optim.Adam(net.parameters(), lr=0.005)
+optimizer = optim.SGD(net.parameters(), lr=0.01, momentum=0.8)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=25, gamma=0.1)
 
 log = 'C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng/logs'
@@ -25,10 +30,13 @@ writer = SummaryWriter(log_dir=log)
 # 数据集获取 data_train/
 train_data = PictureSet(type='train')
 valid_data = PictureSet(type='verify')
-train_loader = DataLoader(dataset=train_data, batch_size=1, shuffle=True)
+train_loader = DataLoader(dataset=train_data, batch_size=10, shuffle=True)
 valid_loader = DataLoader(dataset=valid_data, batch_size=1)
 
-# 训练过程
+net_save_path = 'C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng/results/net_params.pkl'
+# net.load_state_dict(torch.load(net_save_path)) # 该行可选，目前结果已训练5遍
+
+# ----------------------------------训练部分---------------------------------------
 for epoch in range(0, maxEpoch):
 
     loss_sigma = 0.0  # 记录一个epoch的loss之和
@@ -50,9 +58,9 @@ for epoch in range(0, maxEpoch):
         # 统计预测信息
         loss_sigma += loss.item()
 
-        # 每10个iteration 打印一次训练信息，loss为10个iteration的平均
-        if i % 10 == 0:
-            loss_avg = loss_sigma / 10
+        # 每3个iteration 打印一次训练信息，loss为4个iteration的平均
+        if i % 2 == 0:
+            loss_avg = loss_sigma / 2
             loss_sigma = 0.0
             print("Training: Epoch[{:0>3}/{:0>3}] Iteration[{:0>3}/{:0>3}] Loss: {:.4f} Learning Rate: {:.4f}".format(
                 epoch + 1, maxEpoch, i, len(train_loader), loss_avg, scheduler.get_last_lr()[0]))
@@ -68,17 +76,21 @@ for epoch in range(0, maxEpoch):
         writer.add_histogram(name + '_grad', layer.grad.cpu().data.numpy(), epoch)
         writer.add_histogram(name + '_data', layer.cpu().data.numpy(), epoch)
 
-net_save_path = 'C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng/results/net_params.pkl'
 torch.save(net.state_dict(), net_save_path)
 
-# ----------------------------------训练过程---------------------------------------
+writer.close()
 
+# ----------------------------------验证---------------------------------------
 # 选取20个例子进行验证
 for i, data in enumerate(valid_loader):
     if i >= 20:
         break
     raw, ev, tar = data
     result = net.forward(raw, ev)
+    loss = criterion(result, tar)
+    print(loss)
+    tar = torch.squeeze(unNormalize(tar, mean=meanCal, std=stdCal), 0)
+    result = torch.squeeze(unNormalize(result, mean=meanCal, std=stdCal), 0)
     pic_save_path = 'C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng/results/' + str(i+1)
-    transforms.ToPILImage()(tar).save(pic_save_path + 'tar.png')
-    transforms.ToPILImage()(result).save(pic_save_path + 'result.png')
+    transforms.ToPILImage()(tar).save(pic_save_path + '/tar.png')
+    transforms.ToPILImage()(result).save(pic_save_path + '/result.png')
