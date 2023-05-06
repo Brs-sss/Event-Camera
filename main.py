@@ -21,7 +21,7 @@ stdCal = [0.027039433, 0.033439837, 0.03856222]
 criterion = nn.SmoothL1Loss()
 # criterion = nn.MSELoss()
 # optimizer = optim.Adam(net.parameters(), lr=0.005)
-optimizer = optim.SGD(net.parameters(), lr=0.005, momentum=0.8)
+optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.8)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=25, gamma=0.1)
 
 log = 'C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng/logs'
@@ -34,7 +34,8 @@ train_loader = DataLoader(dataset=train_data, batch_size=10, shuffle=True)
 valid_loader = DataLoader(dataset=valid_data, batch_size=1)
 
 net_save_path = 'C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng/results/net_params.pkl'
-# net.load_state_dict(torch.load(net_save_path))  # 该行可选，目前结果已训练1遍
+net_load_path = 'C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng/results/net_params_third_1.pkl'
+net.load_state_dict(torch.load(net_load_path))  # 该行可选，目前结果已训练1遍
 
 # ----------------------------------训练部分---------------------------------------
 for epoch in range(0, maxEpoch):

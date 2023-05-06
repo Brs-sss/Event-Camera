@@ -18,228 +18,140 @@ class ReconstructionNet(nn.Module):
     def __init__(self):
         super(ReconstructionNet, self).__init__()
 
-        # 对阴暗图片提取特征过程中每一层提取不同规模特征的卷积算子
-        in_channel = [6, 24, 96, 192, 384]
-        out_channel = [4, 16, 32, 64, 128]
+        # 每一层提取不同规模特征的卷积算子
+        in_channel = [6, 18, 36, 18, 18]
+        out_channel = [6, 9, 18, 18, 18]
 
         self._1_1_conv = []
         self._3_3_conv = []
         self._5_5_conv = []
+        self._ReLu = []
 
         for i in range(0, 5):
-            self._1_1_conv.append(nn.Sequential(
-                nn.Conv2d(in_channels=in_channel[i], out_channels=out_channel[i], kernel_size=(1, 1), padding=0),
-                nn.BatchNorm2d(num_features=out_channel[i], affine=True),
-                nn.ReLU(inplace=True)
-            ))
-            self._3_3_conv.append(nn.Sequential(
-                nn.Conv2d(in_channels=in_channel[i], out_channels=out_channel[i], kernel_size=(3, 3), padding=1),
-                nn.BatchNorm2d(num_features=out_channel[i], affine=True),
-                nn.ReLU(inplace=True)
-            ))
+            self._1_1_conv.append(
+                nn.Conv2d(in_channels=in_channel[i], out_channels=out_channel[i], kernel_size=(1, 1), padding=0)
+            )
+            self._3_3_conv.append(
+                nn.Conv2d(in_channels=in_channel[i], out_channels=out_channel[i], kernel_size=(3, 3), padding=1)
+            )
             mediate_channel = int((in_channel[i] + out_channel[i]) / 2)
             self._5_5_conv.append(nn.Sequential(
                 nn.Conv2d(in_channels=in_channel[i], out_channels=mediate_channel, kernel_size=(3, 3), padding=1),
-                nn.Conv2d(in_channels=mediate_channel, out_channels=out_channel[i], kernel_size=(3, 3), padding=1),
+                nn.Conv2d(in_channels=mediate_channel, out_channels=out_channel[i], kernel_size=(3, 3), padding=1)
+            ))
+            self._ReLu.append(nn.Sequential(
                 nn.BatchNorm2d(num_features=out_channel[i], affine=True),
                 nn.ReLU(inplace=True)
             ))
 
-        # 对阴暗图片进行下采样的卷积算子
-        # 可能在down开始添加一步融会增进学习能力
-        self.down1 = nn.Sequential(
-            nn.Conv2d(in_channels=12, out_channels=12, kernel_size=(2, 2), stride=(2, 2)),
-            nn.BatchNorm2d(num_features=12, affine=True),
-            nn.ReLU(inplace=True)
-        )
-        self.down2 = nn.Sequential(
-            nn.Conv2d(in_channels=48, out_channels=48, kernel_size=(2, 2), stride=(2, 2)),
-            nn.BatchNorm2d(num_features=48, affine=True),
-            nn.ReLU(inplace=True)
-        )
-        self.down3 = nn.Sequential(
-            nn.Conv2d(in_channels=96, out_channels=96, kernel_size=(2, 2), stride=(2, 2)),
-            nn.BatchNorm2d(num_features=96, affine=True),
-            nn.ReLU(inplace=True)
-        )
-        self.down4 = nn.Sequential(
-            nn.Conv2d(in_channels=192, out_channels=192, kernel_size=(2, 2), stride=(2, 2)),
-            nn.BatchNorm2d(num_features=192, affine=True),
-            nn.ReLU(inplace=True)
-        )
+        # 两次循环中的33卷积
+        self.cir1 = nn.Conv2d(in_channels=18, out_channels=18, kernel_size=(3, 3), padding=1)
+        self.cir2 = nn.Sequential(
+                nn.Conv2d(in_channels=18, out_channels=18, kernel_size=(3, 3), padding=1),
+                nn.BatchNorm2d(num_features=out_channel[i], affine=True),
+                nn.ReLU(inplace=True))
+        self.cir3 = nn.Conv2d(in_channels=18, out_channels=18, kernel_size=(3, 3), padding=1)
+        self.cir4 = nn.Sequential(
+            nn.Conv2d(in_channels=18, out_channels=18, kernel_size=(3, 3), padding=1),
+            nn.BatchNorm2d(num_features=out_channel[i], affine=True),
+            nn.ReLU(inplace=True))
 
-        # 对事件流预处理tensor提取特征过程中每一层提取不同规模特征的卷积算子
-        ev_in_channel = [5, 16, 32, 64, 128]
-        ev_out_channel = [1, 4, 16, 32, 64]
+        # 对事件流预处理tensor提取特征过程的卷积算子
+        ev_in_channel = [5, 10, 15]
+        ev_out_channel = [1, 2, 3]
 
         self.ev_1_1_conv = []
         self.ev_3_3_conv = []
         self.ev_5_5_conv = []
+        self.ev_merge_ReLu = []
+        self._5_to_10 = nn.Conv2d(in_channels=5, out_channels=10, kernel_size=(1, 1), padding=0)
+        self._10_to_15 = nn.Conv2d(in_channels=10, out_channels=15, kernel_size=(1, 1), padding=0)
 
-        for i in range(0, 5):
+        for i in range(0, 3):
             self.ev_1_1_conv.append(nn.Sequential(
                 nn.Conv2d(in_channels=ev_in_channel[i], out_channels=ev_out_channel[i], kernel_size=(1, 1), padding=0),
-                nn.BatchNorm2d(num_features=ev_out_channel[i], affine=True),
-                nn.ReLU(inplace=True)
             ))
             self.ev_3_3_conv.append(nn.Sequential(
                 nn.Conv2d(in_channels=ev_in_channel[i], out_channels=ev_out_channel[i], kernel_size=(3, 3), padding=1),
-                nn.BatchNorm2d(num_features=ev_out_channel[i], affine=True),
-                nn.ReLU(inplace=True)
             ))
             mediate_channel = int((ev_in_channel[i] + ev_out_channel[i])/2)
             self.ev_5_5_conv.append(nn.Sequential(
                 nn.Conv2d(in_channels=ev_in_channel[i], out_channels=mediate_channel, kernel_size=(3, 3), padding=1),
                 nn.Conv2d(in_channels=mediate_channel, out_channels=ev_out_channel[i], kernel_size=(3, 3), padding=1),
-                nn.BatchNorm2d(num_features=ev_out_channel[i], affine=True),
+            ))
+            self.ev_merge_ReLu.append(nn.Sequential(
+                nn.BatchNorm2d(num_features=3 * ev_out_channel[i], affine=True),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(in_channels=3*ev_out_channel[i], out_channels=3*ev_out_channel[i], kernel_size=(3, 3), padding=1),
+                nn.BatchNorm2d(num_features=3*ev_out_channel[i], affine=True),
                 nn.ReLU(inplace=True)
             ))
 
-        # 对事件流预处理tensor进行下采样的卷积算子
-        # 可能删除down的一步融和会增进学习能力
-        self.evDown1 = nn.Sequential(
-            nn.Conv2d(in_channels=5, out_channels=5, kernel_size=(1, 1)),
-            nn.Conv2d(in_channels=5, out_channels=16, kernel_size=(2, 2), stride=2),
-            nn.BatchNorm2d(num_features=16, affine=True),
-            nn.ReLU(inplace=True)
-        )
-        self.evDown2 = nn.Sequential(
-            nn.Conv2d(in_channels=16, out_channels=16, kernel_size=(1, 1)),
-            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(2, 2), stride=2),
-            nn.BatchNorm2d(num_features=32, affine=True),
-            nn.ReLU(inplace=True)
-        )
-        self.evDown3 = nn.Sequential(
-            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(1, 1)),
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(2, 2), stride=2),
-            nn.BatchNorm2d(num_features=64, affine=True),
-            nn.ReLU(inplace=True)
-        )
-        self.evDown4 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(1, 1)),
-            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=(2, 2), stride=2),
-            nn.BatchNorm2d(num_features=128, affine=True),
-            nn.ReLU(inplace=True)
-        )
-
-        # 对最下层图片进行处理
-        self.bottomProcess = nn.Sequential(
-            nn.Conv2d(in_channels=384, out_channels=384, kernel_size=(3, 3), padding=1),
-            nn.BatchNorm2d(num_features=384, affine=True),
-            nn.ReLU(inplace=True)
-        )
-
-        # 上采样卷积算子
-        # 可能交换conv与tranposed顺序会产生影响
-        self.up4 = nn.Sequential(
-            nn.Conv2d(in_channels=384, out_channels=192, kernel_size=(3, 3), padding=1),
-            nn.ConvTranspose2d(in_channels=192, out_channels=192, kernel_size=4, stride=2,
-                               padding=1, output_padding=(0, 1)),
-            nn.BatchNorm2d(num_features=192, affine=True),
-            nn.ReLU(inplace=True)
-        )
-
-        self.up3 = nn.Sequential(
-            nn.Conv2d(in_channels=384, out_channels=96, kernel_size=(3, 3), padding=1),
-            nn.ConvTranspose2d(in_channels=96, out_channels=96, kernel_size=4, stride=2,
-                               padding=1, output_padding=(1, 0)),
-            nn.BatchNorm2d(num_features=96, affine=True),
-            nn.ReLU(inplace=True)
-        )
-
-        self.up2 = nn.Sequential(
-            nn.Conv2d(in_channels=192, out_channels=48, kernel_size=(3, 3), padding=1),
-            nn.ConvTranspose2d(in_channels=48, out_channels=48, kernel_size=4, stride=2,
-                               padding=1, output_padding=(0, 1)),
-            nn.BatchNorm2d(num_features=48, affine=True),
-            nn.ReLU(inplace=True)
-        )
-
-        self.up1 = nn.Sequential(
-            nn.Conv2d(in_channels=96, out_channels=12, kernel_size=(3, 3), padding=1),
-            nn.ConvTranspose2d(in_channels=12, out_channels=12, kernel_size=4, stride=2,
-                               padding=1, output_padding=(0, 0)),
-            nn.BatchNorm2d(num_features=12, affine=True),
-            nn.ReLU(inplace=True)
-        )
-
         # 最后处理
-        self.picFinalPro1 = nn.Conv2d(in_channels=24, out_channels=12, kernel_size=(3, 3), padding=1)
-        self.picFinalPro2 = nn.Conv2d(in_channels=12, out_channels=3, kernel_size=(3, 3), padding=1)
+        self.picFinalPro1 = nn.Conv2d(in_channels=18, out_channels=9, kernel_size=(3, 3), padding=1)
+        self.picFinalPro2 = nn.Conv2d(in_channels=9, out_channels=3, kernel_size=(3, 3), padding=1)
 
-    def forward(self, pic1_raw, ev):
-        # 下采样过程
-        _1_1_conv_ev1 = self.ev_1_1_conv[0](ev)
-        _3_3_conv_ev1 = self.ev_3_3_conv[0](ev)
-        _5_5_conv_ev1 = self.ev_5_5_conv[0](ev)
-        pic1_raw = torch.cat((pic1_raw, _1_1_conv_ev1, _3_3_conv_ev1, _5_5_conv_ev1), dim=1)  # dim需检查
-        _1_1_conv_pic1 = self._1_1_conv[0](pic1_raw)
-        _3_3_conv_pic1 = self._3_3_conv[0](pic1_raw)
-        _5_5_conv_pic1 = self._5_5_conv[0](pic1_raw)
-        pic1 = torch.cat((_1_1_conv_pic1, _3_3_conv_pic1, _5_5_conv_pic1), dim=1)
-        ev = self.evDown1(ev)
-        pic2_raw = self.down1(pic1)
+    def forward(self, pic0, ev0_raw):
+        # 图像与事件融合过程
+        ev0_1_1_conv = self.ev_1_1_conv[0](ev0_raw)
+        ev0_3_3_conv = self.ev_3_3_conv[0](ev0_raw)
+        ev0_5_5_conv = self.ev_5_5_conv[0](ev0_raw)
+        ev0 = torch.cat((ev0_1_1_conv, ev0_3_3_conv, ev0_5_5_conv), dim=1)
+        ev0 = self.ev_merge_ReLu[0](ev0)
+        pic0 = torch.cat((ev0, pic0), dim=1)
+        pic0_1_1_conv = self._1_1_conv[0](pic0)
+        pic0_3_3_conv = self._3_3_conv[0](pic0)
+        pic0_5_5_conv = self._5_5_conv[0](pic0)
+        pic0_ = (pic0_1_1_conv + pic0_3_3_conv + pic0_5_5_conv) / 3
+        pic1 = self._ReLu[0](pic0_)
 
-        _1_1_conv_ev2 = self.ev_1_1_conv[1](ev)
-        _3_3_conv_ev2 = self.ev_3_3_conv[1](ev)
-        _5_5_conv_ev2 = self.ev_5_5_conv[1](ev)
-        pic2_raw = torch.cat((pic2_raw, _1_1_conv_ev2, _3_3_conv_ev2, _5_5_conv_ev2), dim=1)  # dim需检查
-        _1_1_conv_pic2 = self._1_1_conv[1](pic2_raw)
-        _3_3_conv_pic2 = self._3_3_conv[1](pic2_raw)
-        _5_5_conv_pic2 = self._5_5_conv[1](pic2_raw)
-        pic2 = torch.cat((_1_1_conv_pic2, _3_3_conv_pic2, _5_5_conv_pic2), dim=1)
-        ev = self.evDown2(ev)
-        pic3_raw = self.down2(pic2)
+        ev1_raw = self._5_to_10(ev0_raw)
+        ev1_1_1_conv = self.ev_1_1_conv[1](ev1_raw)
+        ev1_3_3_conv = self.ev_3_3_conv[1](ev1_raw)
+        ev1_5_5_conv = self.ev_5_5_conv[1](ev1_raw)
+        ev1 = torch.cat((ev1_1_1_conv, ev1_3_3_conv, ev1_5_5_conv), dim=1)
+        ev1 = self.ev_merge_ReLu[1](ev1)
+        pic1 = torch.cat((ev1, pic1, pic0), dim=1)
+        pic1_1_1_conv = self._1_1_conv[1](pic1)
+        pic1_3_3_conv = self._3_3_conv[1](pic1)
+        pic1_5_5_conv = self._5_5_conv[1](pic1)
+        pic1_ = (pic1_1_1_conv + pic1_3_3_conv + pic1_5_5_conv) / 3
+        pic2 = self._ReLu[1](pic1_)
 
-        _1_1_conv_ev3 = self.ev_1_1_conv[2](ev)
-        _3_3_conv_ev3 = self.ev_3_3_conv[2](ev)
-        _5_5_conv_ev3 = self.ev_5_5_conv[2](ev)
-        pic3_raw = torch.cat((pic3_raw, _1_1_conv_ev3, _3_3_conv_ev3, _5_5_conv_ev3), dim=1)  # dim需检查
-        _1_1_conv_pic3 = self._1_1_conv[2](pic3_raw)
-        _3_3_conv_pic3 = self._3_3_conv[2](pic3_raw)
-        _5_5_conv_pic3 = self._5_5_conv[2](pic3_raw)
-        pic3 = torch.cat((_1_1_conv_pic3, _3_3_conv_pic3, _5_5_conv_pic3), dim=1)
-        ev = self.evDown3(ev)
-        pic4_raw = self.down3(pic3)
+        ev2_raw = self._10_to_15(ev1_raw)
+        ev2_1_1_conv = self.ev_1_1_conv[2](ev2_raw)
+        ev2_3_3_conv = self.ev_3_3_conv[2](ev2_raw)
+        ev2_5_5_conv = self.ev_5_5_conv[2](ev2_raw)
+        ev2 = torch.cat((ev2_1_1_conv, ev2_3_3_conv, ev2_5_5_conv), dim=1)
+        ev2 = self.ev_merge_ReLu[2](ev2)
+        pic2 = torch.cat((ev2, pic2, pic1), dim=1)
+        pic2_1_1_conv = self._1_1_conv[2](pic2)
+        pic2_3_3_conv = self._3_3_conv[2](pic2)
+        pic2_5_5_conv = self._5_5_conv[2](pic2)
+        pic2_ = (pic2_1_1_conv + pic2_3_3_conv + pic2_5_5_conv) / 3
+        picpro0 = self._ReLu[2](pic2_)
 
-        _1_1_conv_ev4 = self.ev_1_1_conv[3](ev)
-        _3_3_conv_ev4 = self.ev_3_3_conv[3](ev)
-        _5_5_conv_ev4 = self.ev_5_5_conv[3](ev)
-        pic4_raw = torch.cat((pic4_raw, _1_1_conv_ev4, _3_3_conv_ev4, _5_5_conv_ev4), dim=1)  # dim需检查
-        _1_1_conv_pic4 = self._1_1_conv[3](pic4_raw)
-        _3_3_conv_pic4 = self._3_3_conv[3](pic4_raw)
-        _5_5_conv_pic4 = self._5_5_conv[3](pic4_raw)
-        pic4 = torch.cat((_1_1_conv_pic4, _3_3_conv_pic4, _5_5_conv_pic4), dim=1)
-        ev = self.evDown4(ev)
-        pic5_raw = self.down4(pic4)
+        picpro1_1_1_conv = self._1_1_conv[3](picpro0)
+        picpro1_3_3_conv = self._3_3_conv[3](picpro0)
+        picpro1_5_5_conv = self._5_5_conv[3](picpro0)
+        picpro1 = (picpro1_1_1_conv + picpro1_3_3_conv + picpro1_5_5_conv) / 3
+        picpro1 = (picpro1 + picpro0) / 2
+        picpro2 = self.cir1(picpro1)
+        picpro2 = (picpro2 + 2*picpro1) / 3
+        picpro3 = self.cir2(picpro2)
 
-        _1_1_conv_ev5 = self.ev_1_1_conv[4](ev)
-        _3_3_conv_ev5 = self.ev_3_3_conv[4](ev)
-        _5_5_conv_ev5 = self.ev_5_5_conv[4](ev)
-        pic5_raw = torch.cat((pic5_raw, _1_1_conv_ev5, _3_3_conv_ev5, _5_5_conv_ev5), dim=1)  # dim需检查
-        _1_1_conv_pic5 = self._1_1_conv[4](pic5_raw)
-        _3_3_conv_pic5 = self._3_3_conv[4](pic5_raw)
-        _5_5_conv_pic5 = self._5_5_conv[4](pic5_raw)
-        pic5 = torch.cat((_1_1_conv_pic5, _3_3_conv_pic5, _5_5_conv_pic5), dim=1)
+        picpro4_1_1_conv = self._1_1_conv[4](picpro3)
+        picpro4_3_3_conv = self._3_3_conv[4](picpro3)
+        picpro4_5_5_conv = self._5_5_conv[4](picpro3)
+        picpro4 = (picpro4_1_1_conv + picpro4_3_3_conv + picpro4_5_5_conv) / 3
+        picpro4 = (picpro4 + picpro3) / 2
+        picpro5 = self.cir3(picpro4)
+        picpro5 = (picpro5 + 2*picpro4) / 3
+        pic = self.cir4(picpro5)
 
-        # 底层处理
-        pic5_pro = self.bottomProcess(pic5)
+        result = self.picFinalPro1(pic)
+        result = self.picFinalPro2(result)
 
-        # upward 过程
-        pic4_pro = self.up4(pic5_pro)
-        pic4_pro = torch.cat((pic4_pro, pic4), dim=1)
-
-        pic3_pro = self.up3(pic4_pro)
-        pic3_pro = torch.cat((pic3_pro, pic3), dim=1)
-
-        pic2_pro = self.up2(pic3_pro)
-        pic2_pro = torch.cat((pic2_pro, pic2), dim=1)
-
-        pic1_pro = self.up1(pic2_pro)
-        pic1_pro = torch.cat((pic1_pro, pic1), dim=1)
-
-        mediate = self.picFinalPro1(pic1_pro)
-        result = self.picFinalPro2(mediate)
         return result
 
     def paraInit(self):
