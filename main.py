@@ -11,17 +11,16 @@ from tensorboardX import SummaryWriter
 import sys
 sys.path.append("C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng")
 
-
 # ----------------------------------基本准备---------------------------------------
 net = ReconstructionNet()
-maxEpoch = 1
+maxEpoch = 2
 meanCal = [0.0024475607, 0.0055219554, 0.010198287]
 stdCal = [0.027039433, 0.033439837, 0.03856222]
 
 criterion = nn.SmoothL1Loss()
 # criterion = nn.MSELoss()
 # optimizer = optim.Adam(net.parameters(), lr=0.005)
-optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.8)
+optimizer = optim.SGD(net.parameters(), lr=0.0005, momentum=0.8)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=25, gamma=0.1)
 
 log = 'C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng/logs'
@@ -34,10 +33,14 @@ train_loader = DataLoader(dataset=train_data, batch_size=10, shuffle=True)
 valid_loader = DataLoader(dataset=valid_data, batch_size=1)
 
 net_save_path = 'C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng/results/net_params.pkl'
-net_load_path = 'C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng/results/net_params_third_1.pkl'
+net_load_path = 'C:/Users/MSI-NB/Desktop/Python Projects/srt/bairunsheng/results/net_params_third_2.pkl'
 net.load_state_dict(torch.load(net_load_path))  # 该行可选，目前结果已训练1遍
 
+device = torch.device("cuda")  # 使用gpu训练
+net = net.to(device)
+criterion = criterion.to(device)
 # ----------------------------------训练部分---------------------------------------
+print(next(net.parameters()).is_cuda)
 for epoch in range(0, maxEpoch):
 
     loss_sigma = 0.0  # 记录一个epoch的loss之和
@@ -49,6 +52,9 @@ for epoch in range(0, maxEpoch):
         raw, ev, tar = data
         # raw = torch.squeeze(raw, 0)
         # ev = torch.squeeze(ev, 0)
+        raw = raw.to(device)
+        ev = ev.to(device)
+        tar = tar.to(device)
 
         optimizer.zero_grad()
         pro = net.forward(raw, ev)
@@ -73,9 +79,11 @@ for epoch in range(0, maxEpoch):
 
     scheduler.step()  # 更新学习率
     # 每个epoch，记录梯度，权值
+    '''
     for name, layer in net.named_parameters():
         writer.add_histogram(name + '_grad', layer.grad.cpu().data.numpy(), epoch)
         writer.add_histogram(name + '_data', layer.cpu().data.numpy(), epoch)
+    '''
 
 torch.save(net.state_dict(), net_save_path)
 
@@ -87,6 +95,9 @@ for i, data in enumerate(valid_loader):
     if i >= 20:
         break
     raw, ev, tar = data
+    raw = raw.to(device)
+    ev = ev.to(device)
+    tar = tar.to(device)
     result = net.forward(raw, ev)
     loss = criterion(result, tar)
     print(loss)

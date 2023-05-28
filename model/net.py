@@ -22,10 +22,10 @@ class ReconstructionNet(nn.Module):
         in_channel = [6, 18, 36, 18, 18]
         out_channel = [6, 9, 18, 18, 18]
 
-        self._1_1_conv = []
-        self._3_3_conv = []
-        self._5_5_conv = []
-        self._ReLu = []
+        self._1_1_conv = nn.ModuleList()
+        self._3_3_conv = nn.ModuleList()
+        self._5_5_conv = nn.ModuleList()
+        self._ReLu = nn.ModuleList()
 
         for i in range(0, 5):
             self._1_1_conv.append(
@@ -60,10 +60,10 @@ class ReconstructionNet(nn.Module):
         ev_in_channel = [5, 10, 15]
         ev_out_channel = [1, 2, 3]
 
-        self.ev_1_1_conv = []
-        self.ev_3_3_conv = []
-        self.ev_5_5_conv = []
-        self.ev_merge_ReLu = []
+        self.ev_1_1_conv = nn.ModuleList()
+        self.ev_3_3_conv = nn.ModuleList()
+        self.ev_5_5_conv = nn.ModuleList()
+        self.ev_merge_ReLu = nn.ModuleList()
         self._5_to_10 = nn.Conv2d(in_channels=5, out_channels=10, kernel_size=(1, 1), padding=0)
         self._10_to_15 = nn.Conv2d(in_channels=10, out_channels=15, kernel_size=(1, 1), padding=0)
 
