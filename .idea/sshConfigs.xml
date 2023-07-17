@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SshConfigs">
+    <configs>
+      <sshConfig host="166.111.80.50" id="be965152-b9b6-45d4-a796-29aabb1eeca9" keyPath="C:\Users\MSI-NB\.ssh\id_rsa" port="22" nameFormat="DESCRIPTIVE" username="srt23_ev" useOpenSSHConfig="true" />
+    </configs>
+  </component>
+</project>
